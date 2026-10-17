@@ -8,6 +8,9 @@ body { margin: 0; min-width: 320px; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 .font-serif { font-family: 'Playfair Display', Georgia, serif; }
+.install-trigger { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; border: 1px solid #dfd2c4; border-radius: 10px; background: #fffdfa; padding: 0 11px; color: #725e4c; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .2s, border-color .2s; }
+.install-trigger:hover { border-color: #c4aa8e; background: #f7f0e8; }
+.install-trigger-mobile, .install-trigger-desktop { display: none; }
 .install-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 20px; background: rgba(38,31,25,.52); backdrop-filter: blur(4px); animation: install-backdrop-in .2s ease-out; }
 .install-dialog { position: relative; width: min(100%, 430px); border: 1px solid #e8dfd4; border-radius: 26px; background: #fffdfa; padding: 34px 28px 24px; text-align: center; box-shadow: 0 26px 80px rgba(38,31,25,.24); animation: install-dialog-in .25s ease-out; }
 .install-close { position: absolute; top: 14px; right: 14px; display: grid; width: 38px; height: 38px; place-items: center; border: 0; border-radius: 50%; background: #f7f0e8; color: #806c5a; }
@@ -23,6 +26,8 @@ button { cursor: pointer; }
 @keyframes install-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes install-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .install-backdrop, .install-dialog { animation: none; } }
+@media (min-width: 360px) { .install-trigger-mobile { display: inline; } }
+@media (min-width: 640px) { .install-trigger { min-height: 42px; padding: 0 13px; font-size: 13px; } .install-trigger-mobile { display: none; } .install-trigger-desktop { display: inline; } }
 input, select, textarea { width: 100%; border: 1px solid #e5d9cc; border-radius: 11px; background: #fffdfa; color: #40372f; padding: 12px 13px; outline: none; transition: border-color .2s, box-shadow .2s; }
 input:focus, select:focus, textarea:focus { border-color: #a98b6e; box-shadow: 0 0 0 3px rgba(169,139,110,.12); }
 input::placeholder, textarea::placeholder { color: #b4a79a; }
