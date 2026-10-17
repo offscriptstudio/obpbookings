@@ -10,7 +10,7 @@ import { bookingErrorMessage, bookingMessage, Booking, DEFAULT_SLOTS, formatDate
 import { isDemoMode, supabase } from '@/lib/supabase';
 import type { SalonSettings } from '@/types';
 
-const defaultSettings: SalonSettings = { id: true, salon_name: 'Organic by Pooja', whatsapp_number: '+91 9102163439', timezone: 'Asia/Kolkata', opening_time: '09:00', closing_time: '21:00', slot_duration_minutes: 60, capacity_per_slot: 2, working_days: [1, 2, 3, 4, 5, 6], closed_dates: [] };
+const defaultSettings: SalonSettings = { id: true, salon_name: 'Organic by Pooja', whatsapp_number: '+91 9102163439', timezone: 'Asia/Kolkata', opening_time: '09:00', closing_time: '21:00', slot_duration_minutes: 60, capacity_per_slot: 2, working_days: [1, 2, 3, 4, 5, 6, 7], closed_dates: [] };
 const bookingSchema = z.object({ customer_name: z.string().min(2, 'Please enter your full name'), customer_phone: z.string().regex(/^\+91[6-9][0-9]{9}$/, 'Use a valid 10-digit Indian mobile number'), appointment_date: z.string().min(1, 'Choose a date'), start_time: z.string().min(1, 'Choose a time'), purpose: z.string().min(2, 'Choose a purpose'), additional_notes: z.string().max(1000).optional() });
 type BookingForm = z.infer<typeof bookingSchema>;
 
@@ -198,6 +198,67 @@ function CalendarView() { const { bookings } = useBookings(); const [month, setM
 
 function QrCodeView() { const url = import.meta.env.VITE_PUBLIC_SITE_URL ?? window.location.origin; return <div className="mx-auto max-w-2xl"><p className="text-sm text-[#9b8876]">A simple welcome at reception.</p><h1 className="mt-1 font-serif text-4xl">Your booking QR code</h1><div className="mt-8 grid gap-8 rounded-2xl border border-[#e7ded3] bg-[#fffdfa] p-8 md:grid-cols-[220px_1fr] md:items-center"><div className="qr-card"><div className="qr-placeholder"><QRCodeSVG value={url} size={150} bgColor="#fffdfa" fgColor="#38281f" includeMargin /></div><p className="mt-4 font-serif text-xl">Organic by Pooja</p><p className="mt-1 text-xs uppercase tracking-[.18em] text-[#a98b6e]">Scan to book</p></div><div><h2 className="font-serif text-2xl">Make it effortless</h2><p className="mt-3 text-sm leading-6 text-[#766b61]">Place this QR code at the reception desk so guests can book their next visit in under a minute.</p><p className="mt-5 break-all rounded-lg bg-[#f6f0e9] p-3 text-xs text-[#8e7c6c]">{url}</p><div className="mt-5 flex flex-wrap gap-3"><button className="btn-primary" onClick={() => window.print()}>Print poster <FileText size={16} /></button><button className="btn-secondary" onClick={() => navigator.clipboard.writeText(url)}><Copy size={16} /> Copy link</button></div><p className="mt-4 text-xs text-[#a49484]">The QR preview is ready for this website. Print from a deployed address for your final reception poster.</p></div></div></div>; }
 
-function SettingsView() { const [settings, setSettings] = useState(defaultSettings); const [saved, setSaved] = useState(false); useEffect(() => { supabase?.from('salon_settings').select('*').eq('id', true).maybeSingle().then(({ data }) => { if (data) setSettings(data as SalonSettings); }); }, []); const save = async () => { if (supabase) await supabase.from('salon_settings').update({ salon_name: settings.salon_name, whatsapp_number: settings.whatsapp_number, opening_time: settings.opening_time, closing_time: settings.closing_time, capacity_per_slot: settings.capacity_per_slot, working_days: settings.working_days }).eq('id', true); setSaved(true); setTimeout(() => setSaved(false), 1800); }; return <div className="mx-auto max-w-3xl"><p className="text-sm text-[#9b8876]">Keep the experience current.</p><h1 className="mt-1 font-serif text-4xl">Salon settings</h1><div className="mt-8 rounded-2xl border border-[#e7ded3] bg-[#fffdfa] p-6 md:p-8"><div className="grid gap-5 sm:grid-cols-2"><Field label="Salon name"><input value={settings.salon_name} onChange={e => setSettings({ ...settings, salon_name: e.target.value })} /></Field><Field label="WhatsApp number"><input value={settings.whatsapp_number} onChange={e => setSettings({ ...settings, whatsapp_number: e.target.value })} /></Field><Field label="Opening time"><input type="time" value={settings.opening_time} onChange={e => setSettings({ ...settings, opening_time: e.target.value })} /></Field><Field label="Closing time"><input type="time" value={settings.closing_time} onChange={e => setSettings({ ...settings, closing_time: e.target.value })} /></Field><Field label="Capacity per hour"><input type="number" min="1" max="20" value={settings.capacity_per_slot} onChange={e => setSettings({ ...settings, capacity_per_slot: Number(e.target.value) })} /></Field><Field label="Timezone"><input value={settings.timezone} readOnly /></Field></div><div className="mt-8 flex items-center justify-between border-t border-[#eee5da] pt-6"><p className="text-xs text-[#9b8876]">Slot length is fixed at 60 minutes for this salon.</p><button onClick={save} className="btn-primary">{saved ? 'Saved' : 'Save settings'} <Check size={16} /></button></div></div></div>; }
+function SettingsView() {
+  const [settings, setSettings] = useState(defaultSettings);
+  const [holidayDate, setHolidayDate] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.from('salon_settings').select('*').eq('id', true).maybeSingle().then(({ data, error }) => {
+      if (error) {
+        setSaveError('Could not load salon settings. Please refresh and try again.');
+        return;
+      }
+      if (data) setSettings(data as SalonSettings);
+    });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (supabase) {
+        const { error } = await supabase.from('salon_settings').update({
+          salon_name: settings.salon_name,
+          whatsapp_number: settings.whatsapp_number,
+          opening_time: settings.opening_time,
+          closing_time: settings.closing_time,
+          capacity_per_slot: settings.capacity_per_slot,
+          working_days: [1, 2, 3, 4, 5, 6, 7],
+          closed_dates: settings.closed_dates,
+        }).eq('id', true);
+        if (error) {
+          setSaveError('Could not save salon settings. Please try again.');
+          return;
+        }
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
+    } catch {
+      setSaveError('Could not save salon settings. Please check your connection and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addHoliday = () => {
+    if (!holidayDate || settings.closed_dates.includes(holidayDate)) return;
+    setSettings(current => ({ ...current, closed_dates: [...current.closed_dates, holidayDate].sort() }));
+    setHolidayDate('');
+    setSaved(false);
+    setSaveError('');
+  };
+
+  const removeHoliday = (date: string) => {
+    setSettings(current => ({ ...current, closed_dates: current.closed_dates.filter(item => item !== date) }));
+    setSaved(false);
+    setSaveError('');
+  };
+
+  return <div className="mx-auto max-w-3xl"><p className="text-sm text-[#9b8876]">Keep the experience current.</p><h1 className="mt-1 font-serif text-4xl">Salon settings</h1><div className="mt-8 rounded-2xl border border-[#e7ded3] bg-[#fffdfa] p-6 md:p-8"><div className="grid gap-5 sm:grid-cols-2"><Field label="Salon name"><input value={settings.salon_name} onChange={e => setSettings({ ...settings, salon_name: e.target.value })} /></Field><Field label="WhatsApp number"><input value={settings.whatsapp_number} onChange={e => setSettings({ ...settings, whatsapp_number: e.target.value })} /></Field><Field label="Opening time"><input type="time" value={settings.opening_time} onChange={e => setSettings({ ...settings, opening_time: e.target.value })} /></Field><Field label="Closing time"><input type="time" value={settings.closing_time} onChange={e => setSettings({ ...settings, closing_time: e.target.value })} /></Field><Field label="Capacity per hour"><input type="number" min="1" max="20" value={settings.capacity_per_slot} onChange={e => setSettings({ ...settings, capacity_per_slot: Number(e.target.value) })} /></Field><Field label="Timezone"><input value={settings.timezone} readOnly /></Field></div><section className="mt-8 border-t border-[#eee5da] pt-6"><h2 className="font-serif text-2xl">Holiday closures</h2><p className="mt-1 text-sm text-[#8b7b6d]">The parlor is open every day. Add a date here only when you want to stop bookings for a holiday or special closure.</p><div className="mt-4 flex flex-wrap items-end gap-3"><Field label="Date to close"><input type="date" value={holidayDate} onChange={event => setHolidayDate(event.target.value)} /></Field><button type="button" disabled={!holidayDate || settings.closed_dates.includes(holidayDate)} onClick={addHoliday} className="btn-secondary">Add closure</button></div>{settings.closed_dates.length === 0 ? <p className="mt-4 text-sm text-[#9b8876]">No holiday closures scheduled.</p> : <ul className="mt-4 divide-y divide-[#eee5da] rounded-xl border border-[#eee5da] px-4">{settings.closed_dates.map(date => <li key={date} className="flex items-center justify-between gap-4 py-3 text-sm"><span>{formatDate(date)}</span><button type="button" aria-label={`Reopen ${formatDate(date)}`} onClick={() => removeHoliday(date)} className="text-[#a34d45] hover:underline">Reopen</button></li>)}</ul>}</section><div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[#eee5da] pt-6"><p className="text-xs text-[#9b8876]">Slot length is fixed at 60 minutes. Closure changes take effect after saving.</p><div className="flex items-center gap-3">{saveError && <p role="alert" className="text-sm text-[#a34d45]">{saveError}</p>}<button onClick={save} disabled={saving} className="btn-primary">{saving ? 'Saving…' : saved ? 'Saved' : 'Save settings'} <Check size={16} /></button></div></div></div></div>;
+}
 
 export default App;
