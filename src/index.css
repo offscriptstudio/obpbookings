@@ -11,6 +11,12 @@ button { cursor: pointer; }
 input, select, textarea { width: 100%; border: 1px solid #e5d9cc; border-radius: 11px; background: #fffdfa; color: #40372f; padding: 12px 13px; outline: none; transition: border-color .2s, box-shadow .2s; }
 input:focus, select:focus, textarea:focus { border-color: #a98b6e; box-shadow: 0 0 0 3px rgba(169,139,110,.12); }
 input::placeholder, textarea::placeholder { color: #b4a79a; }
+.date-picker-wrap { position: relative; }
+.date-picker-input { min-height: 58px; border: 2px solid #d7c4b0; border-radius: 14px; padding: 14px 14px 14px 48px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.date-picker-input:focus { border-color: #a98b6e; box-shadow: 0 0 0 3px rgba(169,139,110,.16); }
+.date-picker-attention .date-picker-input { border-color: #b15e55; background: #fff8f6; animation: date-picker-pulse .65s ease-in-out 3; }
+@keyframes date-picker-pulse { 50% { box-shadow: 0 0 0 5px rgba(177,94,85,.2); } }
+@media (prefers-reduced-motion: reduce) { .date-picker-attention .date-picker-input { animation: none; } }
 .phone-field { display: flex; align-items: stretch; overflow: hidden; border: 1px solid #e5d9cc; border-radius: 11px; background: #fffdfa; transition: border-color .2s, box-shadow .2s; }
 .phone-field:focus-within { border-color: #a98b6e; box-shadow: 0 0 0 3px rgba(169,139,110,.12); }
 .phone-field > span { display: grid; min-width: 58px; place-items: center; border-right: 1px solid #e5d9cc; color: #806c5a; font-weight: 600; }
@@ -20,6 +26,11 @@ input::placeholder, textarea::placeholder { color: #b4a79a; }
 .btn-primary { background: #a98b6e; color: white; box-shadow: 0 8px 18px rgba(145,111,78,.15); }
 .btn-primary:hover { background: #927555; transform: translateY(-1px); }
 .btn-primary:disabled { cursor: wait; opacity: .65; transform: none; }
+.btn-whatsapp { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 52px; border-radius: 11px; padding: 0 18px; background: #25d366; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 18px rgba(37,211,102,.18); transition: transform .2s, background .2s, box-shadow .2s; }
+.btn-whatsapp:hover { background: #1ebe5d; transform: translateY(-1px); box-shadow: 0 10px 22px rgba(37,211,102,.24); }
+.btn-whatsapp-pulse { animation: whatsapp-pulse 1.6s ease-in-out infinite; }
+@keyframes whatsapp-pulse { 50% { box-shadow: 0 0 0 6px rgba(37,211,102,.2), 0 10px 24px rgba(37,211,102,.3); } }
+@media (prefers-reduced-motion: reduce) { .btn-whatsapp-pulse { animation: none; } }
 .btn-secondary { border: 1px solid #dfd2c4; background: #fffdfa; color: #725e4c; }
 .btn-secondary:hover { background: #f7f0e8; }
 .slot { min-height: 68px; border: 1px solid #e4d8ca; border-radius: 12px; background: #fffdfa; padding: 10px; text-align: left; color: #4c4138; transition: border-color .2s, background .2s, transform .2s; }

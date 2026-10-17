@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,9 +22,20 @@ function Shell({ children, compact = false }: { children: React.ReactNode; compa
 }
 
 function BookingPage() {
-  const [settings] = useState(defaultSettings); const [availability, setAvailability] = useState<Record<string, { booked_count: number; capacity: number }>>({}); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [step, setStep] = useState(1); const navigate = useNavigate();
+  const [settings] = useState(defaultSettings);
+  const [availability, setAvailability] = useState<Record<string, { booked_count: number; capacity: number }>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [step, setStep] = useState(1);
+  const [datePrompt, setDatePrompt] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
   const { register, handleSubmit, watch, setValue, trigger, formState: { errors } } = useForm<BookingForm>({ resolver: zodResolver(bookingSchema), defaultValues: { customer_phone: '', purpose: '' } });
-  const date = watch('appointment_date'); const selectedTime = watch('start_time'); const purpose = watch('purpose');
+  const date = watch('appointment_date');
+  const selectedTime = watch('start_time');
+  const purpose = watch('purpose');
+  const dateRegistration = register('appointment_date');
+
   useEffect(() => {
     setValue('start_time', '');
     setAvailability({});
@@ -53,6 +64,7 @@ function BookingPage() {
       setLoading(false);
     }
   }, [date, setValue]);
+
   const onSubmit = async (values: BookingForm) => {
     setError('');
     setLoading(true);
@@ -94,13 +106,176 @@ function BookingPage() {
       setLoading(false);
     }
   };
+
+  const requestDate = () => {
+    setDatePrompt(true);
+    setError('Please select a date first to see available times.');
+    dateInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    dateInputRef.current?.focus();
+  };
+
+  const continueToReview = () => {
+    if (!date) {
+      requestDate();
+      return;
+    }
+    if (selectedTime) setStep(3);
+    else setError('Choose an available time to continue.');
+  };
+
   const minDate = format(new Date(), 'yyyy-MM-dd');
-  return <Shell><main className="mx-auto grid max-w-6xl gap-6 px-5 pb-10 pt-2 md:gap-12 md:grid-cols-[1fr_1.12fr] md:items-center md:px-10 md:pb-16 md:pt-10"><section className="md:pb-10"><div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#ddcfbf] bg-[#fcfaf6] px-4 py-2 text-xs font-medium uppercase tracking-[.18em] text-[#987a5d]"><span className="h-2 w-2 rounded-full bg-[#9ca98e]" /> Now accepting appointments</div><h1 className="max-w-xl font-serif text-5xl leading-[1.02] tracking-[-.04em] text-[#332d28] md:text-7xl">A little time<br /><em className="text-[#a98b6e]">just for you.</em></h1><p className="mt-7 hidden max-w-md text-base leading-7 text-[#766b61] md:block">Thoughtful beauty rituals, personalised care, and a calm space to feel completely yourself.</p><div className="mt-9 hidden flex-wrap gap-7 text-sm text-[#6f6257] md:flex"><span><Sparkles className="mr-2 inline text-[#a98b6e]" size={17} />Tailored treatments</span><span><Clock3 className="mr-2 inline text-[#a98b6e]" size={17} />9 AM – 9 PM</span></div></section><section className="rounded-[28px] border border-[#e8dfd4] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(83,62,42,.09)] md:p-8"><div className="mb-8 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.2em] text-[#aa9176]">Book your visit</p><h2 className="mt-2 font-serif text-3xl text-[#332d28]">{step === 3 ? 'Review details' : 'Find your moment'}</h2></div><span className="text-sm text-[#a98b6e]">0{step} <span className="text-[#d0c1b2]">/ 03</span></span></div><div className="mb-8 h-1 rounded-full bg-[#eee5da]"><div className="h-full rounded-full bg-[#a98b6e] transition-all" style={{ width: `${step * 33.33}%` }} /></div><form onSubmit={handleSubmit(onSubmit)}>{step === 1 && <div className="space-y-5"><Field label="Full name" error={errors.customer_name?.message}><input {...register('customer_name')}  /></Field><Field label="Phone number" error={errors.customer_phone?.message}><div className="phone-field"><span>+91</span><input {...register('customer_phone', { setValueAs: (value: string) => { const digits = value.replace(/\D/g, '').slice(0, 10); return digits ? `+91${digits}` : ''; } })} inputMode="numeric" maxLength={10}  /></div></Field><Field label="Purpose of visit" error={errors.purpose?.message}><select {...register('purpose')}><option value="">Choose a service</option>{PURPOSES.map(item => <option key={item}>{item}</option>)}</select></Field>{purpose === 'Other' && <Field label="Tell us a little more"><textarea {...register('additional_notes')} rows={3} placeholder="What would you like us to know?" /></Field>}<button type="button" onClick={async () => { const valid = await trigger(['customer_name', 'customer_phone', 'purpose']); if (valid) setStep(2); }} className="btn-primary mt-2 w-full">Choose a date <ArrowRight size={17} /></button></div>}{step === 2 && <div><Field label="Select a date" error={errors.appointment_date?.message}><input {...register('appointment_date')} type="date" min={minDate} /></Field><div className="mt-6 flex items-center justify-between"><p className="text-sm font-semibold text-[#4a413a]">Available times</p>{loading && <span className="text-xs text-[#a98b6e]">Checking availability…</span>}</div>{!date && <p className="mt-3 rounded-xl bg-[#f7f0e8] p-3 text-sm text-[#806c5a]">Please select a date first to see available times.</p>}{date && !loading && supabase && Object.keys(availability).length === 0 && <p className="mt-3 rounded-xl bg-[#f7f0e8] p-3 text-sm text-[#806c5a]">No appointments are available on this date. Please choose another date.</p>}<div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{DEFAULT_SLOTS.map(slot => { const info = availability[slot.start_time]; const left = info ? info.capacity - info.booked_count : date && supabase ? 0 : settings.capacity_per_slot; return <button type="button" key={slot.start_time} disabled={loading || (!!date && !!supabase && !info) || (!!date && left <= 0)} onClick={() => { if (!date) { setError('Please select a date first.'); return; } if (!info && supabase) { setError('There are no appointments available on this date. Please choose another date.'); return; } setError(''); setValue('start_time', slot.start_time, { shouldValidate: true }); }} className={'slot ' + (selectedTime === slot.start_time ? 'slot-selected ' : '') + (date && left <= 0 ? 'slot-disabled' : '')}><span>{formatTime(slot.start_time)}</span><small>{!date ? 'Select a date first' : left <= 0 ? 'Fully booked' : left + ' spot' + (left > 1 ? 's' : '') + ' left'}</small></button>; })}</div>{errors.start_time && <p className="mt-2 text-xs text-[#b15e55]">{errors.start_time.message}</p>}{error && <p className="mt-4 rounded-xl bg-[#fff1ee] p-3 text-sm text-[#a34d45]">{error}</p>}<div className="mt-7 flex gap-3"><button type="button" className="btn-secondary flex-1" onClick={() => setStep(1)}><ArrowLeft size={16} /> Back</button><button type="button" className="btn-primary flex-1" onClick={() => { if (!date) { setError('Please select a date first.'); return; } if (selectedTime) setStep(3); else setError('Choose an available time to continue.'); }}>Review <ArrowRight size={16} /></button></div></div>}{step === 3 && <div><div className="divide-y divide-[#eee5da] rounded-2xl border border-[#eadfd3] bg-[#fcfaf7]">{[['Name', watch('customer_name')], ['Phone', watch('customer_phone')], ['Date', date ? formatDate(date) : ''], ['Time', selectedTime ? `${formatTime(selectedTime)} – ${formatTime(`${String(Number(selectedTime.slice(0, 2)) + 1).padStart(2, '0')}:00`)}` : ''], ['Purpose', purpose]].map(([label, value]) => <div className="flex justify-between gap-4 px-4 py-4 text-sm" key={label}><span className="text-[#8b7b6d]">{label}</span><strong className="text-right font-medium text-[#40372f]">{value}</strong></div>)}</div>{error && <p className="mt-4 rounded-xl bg-[#fff1ee] p-3 text-sm text-[#a34d45]">{error}</p>}<div className="mt-7 flex gap-3"><button type="button" className="btn-secondary flex-1" onClick={() => setStep(2)}><ArrowLeft size={16} /> Edit</button><button disabled={loading} className="btn-primary flex-1">{loading ? 'Saving…' : 'Confirm appointment'} <Check size={17} /></button></div><p className="mt-4 text-center text-xs leading-5 text-[#978a7d]">Your appointment will be held for you once confirmed. No account needed.</p></div>}</form></section></main><footer className="mx-auto flex max-w-6xl justify-between border-t border-[#e7ded3] px-5 py-6 text-xs text-[#9a8c7f] md:px-10"><span>© {new Date().getFullYear()} Organic by Pooja</span><Link to="/admin/login" className="hover:text-[#a98b6e]">Staff access</Link></footer></Shell>;
+  return <Shell>
+    <main className="mx-auto grid max-w-6xl gap-6 px-5 pb-10 pt-2 md:gap-12 md:grid-cols-[1fr_1.12fr] md:items-center md:px-10 md:pb-16 md:pt-10">
+      <section className="md:pb-10">
+        <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#ddcfbf] bg-[#fcfaf6] px-4 py-2 text-xs font-medium uppercase tracking-[.18em] text-[#987a5d]"><span className="h-2 w-2 rounded-full bg-[#9ca98e]" /> Now accepting appointments</div>
+        <h1 className="max-w-xl font-serif text-5xl leading-[1.02] tracking-[-.04em] text-[#332d28] md:text-7xl">A little time<br /><em className="text-[#a98b6e]">just for you.</em></h1>
+        <p className="mt-7 hidden max-w-md text-base leading-7 text-[#766b61] md:block">Thoughtful beauty rituals, personalised care, and a calm space to feel completely yourself.</p>
+        <div className="mt-9 hidden flex-wrap gap-7 text-sm text-[#6f6257] md:flex"><span><Sparkles className="mr-2 inline text-[#a98b6e]" size={17} />Tailored treatments</span><span><Clock3 className="mr-2 inline text-[#a98b6e]" size={17} />9 AM – 9 PM</span></div>
+      </section>
+      <section className="rounded-[28px] border border-[#e8dfd4] bg-[#fffdfa] p-5 shadow-[0_24px_70px_rgba(83,62,42,.09)] md:p-8">
+        <div className="mb-8 flex items-center justify-between">
+          <div><p className="text-xs font-semibold uppercase tracking-[.2em] text-[#aa9176]">Book your visit</p><h2 className="mt-2 font-serif text-3xl text-[#332d28]">{step === 3 ? 'Review details' : 'Find your moment'}</h2></div>
+          <span className="text-sm text-[#a98b6e]">0{step} <span className="text-[#d0c1b2]">/ 03</span></span>
+        </div>
+        <div className="mb-8 h-1 rounded-full bg-[#eee5da]"><div className="h-full rounded-full bg-[#a98b6e] transition-all" style={{ width: `${step * 33.33}%` }} /></div>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          {step === 1 && <div className="space-y-5">
+            <Field label="Full name" error={errors.customer_name?.message}><input {...register('customer_name')} /></Field>
+            <Field label="Phone number" error={errors.customer_phone?.message}><div className="phone-field"><span>+91</span><input {...register('customer_phone', { setValueAs: (value: string) => { const digits = value.replace(/\D/g, '').slice(0, 10); return digits ? `+91${digits}` : ''; } })} inputMode="numeric" maxLength={10} /></div></Field>
+            <Field label="Purpose of visit" error={errors.purpose?.message}><select {...register('purpose')}><option value="">Choose a service</option>{PURPOSES.map(item => <option key={item}>{item}</option>)}</select></Field>
+            {purpose === 'Other' && <Field label="Tell us a little more"><textarea {...register('additional_notes')} rows={3} placeholder="What would you like us to know?" /></Field>}
+            <button type="button" onClick={async () => { const valid = await trigger(['customer_name', 'customer_phone', 'purpose']); if (valid) setStep(2); }} className="btn-primary mt-2 w-full">Choose a date <ArrowRight size={17} /></button>
+          </div>}
+          {step === 2 && <div className="space-y-6">
+            <section aria-labelledby="date-selection-title">
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#a98b6e]">Step 1 of 2</p>
+                <h3 id="date-selection-title" className="mt-1 text-lg font-semibold text-[#40372f]">Choose your appointment date</h3>
+                <p className="mt-1 text-sm leading-5 text-[#8b7b6d]">Tap the date field below to open the calendar. Available times will appear after you choose a date.</p>
+              </div>
+              <div className={`date-picker-wrap ${datePrompt ? 'date-picker-attention' : ''}`}>
+                <CalendarDays className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#a98b6e]" size={21} aria-hidden="true" />
+                <input
+                  {...dateRegistration}
+                  ref={element => {
+                    dateRegistration.ref(element);
+                    dateInputRef.current = element;
+                  }}
+                  id="appointment-date"
+                  aria-label="Choose your appointment date"
+                  aria-describedby="appointment-date-help"
+                  aria-invalid={datePrompt}
+                  className="date-picker-input"
+                  type="date"
+                  min={minDate}
+                  onChange={event => {
+                    void dateRegistration.onChange(event);
+                    setDatePrompt(false);
+                    setError('');
+                  }}
+                />
+              </div>
+              {datePrompt && <p className="mt-2 text-sm font-medium text-[#a34d45]" id="appointment-date-help" role="alert">Please select a date first to see available times.</p>}
+              {!datePrompt && date && <p className="mt-2 text-sm font-medium text-[#718267]">Selected: {format(parseISO(date), 'EEEE, d MMMM yyyy')}</p>}
+            </section>
+
+            {date ? <>
+              <section aria-labelledby="available-times-title">
+                <div className="flex items-center justify-between gap-3">
+                  <div><p className="text-xs font-semibold uppercase tracking-[.16em] text-[#a98b6e]">Step 2 of 2</p><h3 id="available-times-title" className="mt-1 text-lg font-semibold text-[#40372f]">Choose a time</h3></div>
+                  {loading && <span className="text-xs text-[#a98b6e]" role="status">Checking availability…</span>}
+                </div>
+                {!loading && supabase && Object.keys(availability).length === 0 && <p className="mt-3 rounded-xl bg-[#f7f0e8] p-3 text-sm text-[#806c5a]">No appointments are available on this date. Please choose another date.</p>}
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {DEFAULT_SLOTS.map(slot => {
+                    const info = availability[slot.start_time];
+                    const left = info ? info.capacity - info.booked_count : supabase ? 0 : settings.capacity_per_slot;
+                    return <button
+                      type="button"
+                      key={slot.start_time}
+                      disabled={loading || (!!supabase && !info) || left <= 0}
+                      onClick={() => {
+                        if (!info && supabase) {
+                          setError('There are no appointments available on this date. Please choose another date.');
+                          return;
+                        }
+                        setError('');
+                        setValue('start_time', slot.start_time, { shouldValidate: true });
+                      }}
+                      className={'slot ' + (selectedTime === slot.start_time ? 'slot-selected ' : '') + (left <= 0 ? 'slot-disabled' : '')}
+                    >
+                      <span>{formatTime(slot.start_time)}</span>
+                      <small>{left <= 0 ? 'Fully booked' : left + ' spot' + (left > 1 ? 's' : '') + ' left'}</small>
+                    </button>;
+                  })}
+                </div>
+                {errors.start_time && <p className="mt-2 text-xs text-[#b15e55]">{errors.start_time.message}</p>}
+              </section>
+            </> : !datePrompt && <p className="rounded-xl bg-[#f7f0e8] p-4 text-sm leading-6 text-[#806c5a]">Choose a date above to see the available appointment times.</p>}
+
+            {error && date && <p className="rounded-xl bg-[#fff1ee] p-3 text-sm text-[#a34d45]" role="alert">{error}</p>}
+            <div className="flex gap-3">
+              <button type="button" className="btn-secondary flex-1" onClick={() => setStep(1)}><ArrowLeft size={16} /> Back</button>
+              <button type="button" className="btn-primary flex-1" onClick={continueToReview}>Review <ArrowRight size={16} /></button>
+            </div>
+          </div>}
+          {step === 3 && <div>
+            <div className="divide-y divide-[#eee5da] rounded-2xl border border-[#eadfd3] bg-[#fcfaf7]">{[['Name', watch('customer_name')], ['Phone', watch('customer_phone')], ['Date', date ? formatDate(date) : ''], ['Time', selectedTime ? `${formatTime(selectedTime)} – ${formatTime(`${String(Number(selectedTime.slice(0, 2)) + 1).padStart(2, '0')}:00`)}` : ''], ['Purpose', purpose]].map(([label, value]) => <div className="flex justify-between gap-4 px-4 py-4 text-sm" key={label}><span className="text-[#8b7b6d]">{label}</span><strong className="text-right font-medium text-[#40372f]">{value}</strong></div>)}</div>
+            {error && <p className="mt-4 rounded-xl bg-[#fff1ee] p-3 text-sm text-[#a34d45]">{error}</p>}
+            <div className="mt-7 flex gap-3"><button type="button" className="btn-secondary flex-1" onClick={() => setStep(2)}><ArrowLeft size={16} /> Edit</button><button disabled={loading} className="btn-primary flex-1">{loading ? 'Saving…' : 'Confirm appointment'} <Check size={17} /></button></div>
+            <p className="mt-4 text-center text-xs leading-5 text-[#978a7d]">Your appointment will be held for you once confirmed. No account needed.</p>
+          </div>}
+        </form>
+      </section>
+    </main>
+    <footer className="mx-auto flex max-w-6xl justify-between border-t border-[#e7ded3] px-5 py-6 text-xs text-[#9a8c7f] md:px-10"><span>© {new Date().getFullYear()} Organic by Pooja</span><Link to="/admin/login" className="hover:text-[#a98b6e]">Staff access</Link></footer>
+  </Shell>;
 }
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) { return <label className="block text-sm font-medium text-[#554a41]"><span className="mb-2 block">{label}</span>{children}{error && <span className="mt-1 block text-xs font-normal text-[#b15e55]">{error}</span>}</label>; }
 
-function SuccessPage() { const location = useLocation(); const navigate = useNavigate(); const booking = (location.state as { booking?: Booking } | null)?.booking; const [copied, setCopied] = useState(false); if (!booking) return <Navigate to="/" replace />; const copy = async () => { await navigator.clipboard.writeText(bookingMessage(booking)); setCopied(true); setTimeout(() => setCopied(false), 1800); }; return <Shell compact><main className="mx-auto max-w-2xl px-5 pb-20 pt-10 md:px-10 md:pt-20"><div className="text-center"><div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#e3ebdf] text-[#718267]"><CheckCircle2 size={40} strokeWidth={1.4} /></div><p className="mt-8 text-xs font-semibold uppercase tracking-[.22em] text-[#a98b6e]">You’re all set</p><h1 className="mt-3 font-serif text-5xl tracking-[-.04em] text-[#332d28]">Your appointment<br /><em className="text-[#a98b6e]">is booked.</em></h1><p className="mx-auto mt-5 max-w-md text-sm leading-6 text-[#766b61]">We’ve saved your appointment. Share the details with the salon on WhatsApp when you’re ready.</p></div><div className="mt-10 rounded-[26px] border border-[#e8dfd4] bg-[#fffdfa] p-6 shadow-[0_20px_60px_rgba(83,62,42,.08)] md:p-8"><div className="flex items-center justify-between border-b border-[#eee5da] pb-5"><span className="text-xs uppercase tracking-[.18em] text-[#9b8876]">Booking reference</span><strong className="font-mono text-sm tracking-wider text-[#a27955]">{booking.booking_reference}</strong></div><div className="grid gap-5 pt-6 sm:grid-cols-2">{[['Guest', booking.customer_name], ['Date', formatDate(booking.appointment_date)], ['Time', `${formatTime(booking.start_time)} – ${formatTime(booking.end_time)}`], ['Purpose', booking.purpose]].map(([label, value]) => <div key={label}><span className="block text-xs text-[#a49484]">{label}</span><strong className="mt-1 block text-sm font-medium text-[#41382f]">{value}</strong></div>)}</div><div className="mt-8 space-y-3"><a className="btn-primary w-full" href={whatsappUrl(booking)} target="_blank" rel="noreferrer">Share booking on WhatsApp <ExternalLink size={16} /></a><button className="btn-secondary w-full" onClick={copy}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Copied to clipboard' : 'Copy booking details'}</button></div><p className="mt-4 text-center text-xs text-[#9a8c7f]">WhatsApp will open with your message prepared. Please press Send yourself.</p></div><div className="mt-7 flex justify-center gap-6 text-sm"><button onClick={() => navigate('/')} className="text-[#806c5a] hover:text-[#a98b6e]">Book another appointment</button><Link to="/" className="text-[#806c5a] hover:text-[#a98b6e]">Return home</Link></div></main></Shell>; }
+function WhatsAppIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+    <path d="M20.2 11.7a8.2 8.2 0 0 1-12.1 7.2L4 20l1.1-3.9a8.2 8.2 0 1 1 15.1-4.4Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M9 8.5c.2-.5.5-.6.8-.6h.5c.2 0 .4.1.5.4l.8 1.8c.1.2.1.4 0 .6l-.6.7c-.2.2-.2.4 0 .6.3.5.8 1 1.3 1.4.6.4 1.1.7 1.5.8.2.1.4 0 .5-.1l.7-.8c.2-.2.4-.3.6-.2l1.8.8c.2.1.3.3.3.5 0 .4-.2 1-.6 1.3-.4.4-1.1.6-1.8.5-.7-.1-1.6-.4-2.7-1-1.4-.8-2.5-2-3.2-3.1-.6-.9-.9-1.7-.9-2.4 0-.6.2-1.1.5-1.4Z" fill="currentColor" />
+  </svg>;
+}
+
+function SuccessPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const booking = (location.state as { booking?: Booking } | null)?.booking;
+  const [copied, setCopied] = useState(false);
+  const [shareClicked, setShareClicked] = useState(false);
+  if (!booking) return <Navigate to="/" replace />;
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(bookingMessage(booking));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return <Shell compact>
+    <main className="mx-auto max-w-2xl px-5 pb-20 pt-10 md:px-10 md:pt-20">
+      <div className="text-center">
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#e3ebdf] text-[#718267]"><CheckCircle2 size={40} strokeWidth={1.4} /></div>
+        <p className="mt-8 text-xs font-semibold uppercase tracking-[.22em] text-[#a98b6e]">You’re all set</p>
+        <h1 className="mt-3 font-serif text-5xl tracking-[-.04em] text-[#332d28]">Your appointment<br /><em className="text-[#a98b6e]">is booked.</em></h1>
+        <p className="mx-auto mt-5 max-w-md text-sm leading-6 text-[#766b61]">We’ve saved your appointment. Share the details with the salon on WhatsApp when you’re ready.</p>
+      </div>
+      <div className="mt-10 rounded-[26px] border border-[#e8dfd4] bg-[#fffdfa] p-6 shadow-[0_20px_60px_rgba(83,62,42,.08)] md:p-8">
+        <div className="flex items-center justify-between border-b border-[#eee5da] pb-5"><span className="text-xs uppercase tracking-[.18em] text-[#9b8876]">Booking reference</span><strong className="font-mono text-sm tracking-wider text-[#a27955]">{booking.booking_reference}</strong></div>
+        <div className="grid gap-5 pt-6 sm:grid-cols-2">{[['Guest', booking.customer_name], ['Date', formatDate(booking.appointment_date)], ['Time', `${formatTime(booking.start_time)} – ${formatTime(booking.end_time)}`], ['Purpose', booking.purpose]].map(([label, value]) => <div key={label}><span className="block text-xs text-[#a49484]">{label}</span><strong className="mt-1 block text-sm font-medium text-[#41382f]">{value}</strong></div>)}</div>
+        <div className="mt-8 space-y-3">
+          <a className={`btn-whatsapp w-full ${shareClicked ? '' : 'btn-whatsapp-pulse'}`} href={whatsappUrl(booking)} target="_blank" rel="noreferrer" onClick={() => setShareClicked(true)}><WhatsAppIcon /> Share booking on WhatsApp <ExternalLink size={16} /></a>
+          <button className="btn-secondary w-full" onClick={copy}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Copied to clipboard' : 'Copy booking details'}</button>
+        </div>
+        <p className="mt-4 text-center text-xs text-[#9a8c7f]">WhatsApp will open with your message prepared. Please press Send yourself.</p>
+      </div>
+      <div className="mt-7 flex justify-center gap-6 text-sm"><button onClick={() => navigate('/')} className="text-[#806c5a] hover:text-[#a98b6e]">Book another appointment</button><Link to="/" className="text-[#806c5a] hover:text-[#a98b6e]">Return home</Link></div>
+    </main>
+  </Shell>;
+}
 
 const staffLoginEmail = import.meta.env.VITE_STAFF_AUTH_EMAIL || 'salon-admin@organicbypooja.invalid';
 function LoginPage() {
