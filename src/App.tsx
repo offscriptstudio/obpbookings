@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { addMonths, eachDayOfInterval, endOfMonth, format, isSameDay, isSameMonth, isToday, parseISO, startOfMonth, subMonths } from 'date-fns';
-import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, Clock3, Copy, ExternalLink, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, QrCode, Search, Settings, Sparkles, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, Clock3, Copy, Download, ExternalLink, FileText, LayoutDashboard, LogOut, Menu, Pencil, Plus, QrCode, Search, Settings, Share, Sparkles, Users, X } from 'lucide-react';
 import { bookingErrorMessage, bookingMessage, Booking, DEFAULT_SLOTS, formatDate, formatTime, PURPOSES, reminderWhatsappUrl, whatsappUrl } from '@/lib/booking';
 import { isDemoMode, supabase } from '@/lib/supabase';
 import type { SalonSettings } from '@/types';
@@ -15,7 +15,84 @@ const defaultSettings: SalonSettings = { id: true, salon_name: 'Organic by Pooja
 const bookingSchema = z.object({ customer_name: z.string().min(2, 'Please enter your full name'), customer_phone: z.string().regex(/^\+91[6-9][0-9]{9}$/, 'Use a valid 10-digit Indian mobile number'), appointment_date: z.string().min(1, 'Choose a date'), start_time: z.string().min(1, 'Choose a time'), purpose: z.string().min(2, 'Choose a purpose'), additional_notes: z.string().max(1000).optional() });
 type BookingForm = z.infer<typeof bookingSchema>;
 
-function App() { return <BrowserRouter><Routes><Route path="/" element={<BookingPage />} /><Route path="/booking/success" element={<SuccessPage />} /><Route path="/admin/login" element={<LoginPage />} /><Route path="/admin/*" element={<ProtectedAdmin><AdminApp /></ProtectedAdmin>} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>; }
+function App() { return <BrowserRouter><InstallPrompt /><Routes><Route path="/" element={<BookingPage />} /><Route path="/booking/success" element={<SuccessPage />} /><Route path="/admin/login" element={<LoginPage />} /><Route path="/admin/*" element={<ProtectedAdmin><AdminApp /></ProtectedAdmin>} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter>; }
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+function InstallPrompt() {
+  const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [installError, setInstallError] = useState('');
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (isInstalled) return;
+
+    const timer = window.setTimeout(() => setVisible(true), 700);
+    const handleInstallAvailable = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event as InstallPromptEvent);
+    };
+    const handleInstalled = () => {
+      setInstallEvent(null);
+      setVisible(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleInstallAvailable);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('beforeinstallprompt', handleInstallAvailable);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  const install = async () => {
+    if (!installEvent) {
+      setShowInstructions(true);
+      return;
+    }
+    setInstallError('');
+    try {
+      await installEvent.prompt();
+      const choice = await installEvent.userChoice;
+      setInstallEvent(null);
+      if (choice.outcome === 'accepted') setVisible(false);
+      else setShowInstructions(true);
+    } catch {
+      setInstallError('The install prompt could not be opened. Please use your browser menu to install the app.');
+    }
+  };
+
+  if (!visible) return null;
+
+  return <div className="install-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setVisible(false); }}>
+    <section className="install-dialog" role="dialog" aria-modal="true" aria-labelledby="install-title" aria-describedby="install-description" onKeyDown={event => { if (event.key === 'Escape') setVisible(false); }}>
+      <button type="button" className="install-close" aria-label="Close install prompt" autoFocus onClick={() => setVisible(false)}><X size={20} /></button>
+      <img src="/organic-by-pooja-logo.png" alt="" className="install-logo" />
+      <p className="install-eyebrow">A little self-care, one tap away</p>
+      <h2 id="install-title" className="font-serif">Add Organic by Pooja to your home screen</h2>
+      <p id="install-description" className="install-description">Book appointments faster and open our salon app anytime, right from your home screen.</p>
+      {showInstructions && <div className="install-instructions" role="status">
+        {isIos
+          ? <p>In Safari, tap <Share className="inline-block align-text-bottom" size={16} /> <strong>Share</strong>, then choose <strong>Add to Home Screen</strong>.</p>
+          : <p>Open your browser menu <strong>⋮</strong> and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>}
+      </div>}
+      {installError && <p className="install-error" role="alert">{installError}</p>}
+      <button type="button" className="install-action" onClick={() => void install()}>
+        {installEvent ? <Download size={18} /> : <Share size={18} />}
+        {installEvent ? 'Install the app' : 'Show me how'}
+      </button>
+      <button type="button" className="install-later" onClick={() => setVisible(false)}>Maybe later</button>
+    </section>
+  </div>;
+}
 
 function Shell({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return <div className="min-h-screen bg-[#f8f5ef] text-[#2c2925]"><header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6 md:px-10"><Link to="/" className="flex items-center gap-3"><img src="/organic-by-pooja-logo.png" alt="Organic by Pooja" className="h-10 w-10 rounded-full object-cover" /><span><span className="block font-serif text-xl leading-none tracking-tight">Organic by Pooja</span><span className="mt-1 block text-[10px] uppercase tracking-[.28em] text-[#9a8067]">Beauty · Wellness · Care</span></span></Link>{!compact && <Link to="/admin/login" className="hidden text-sm font-medium text-[#6f6257] transition hover:text-[#a98b6e] sm:block">Admin login <ArrowRight className="ml-1 inline" size={15} /></Link>}</header>{children}</div>;

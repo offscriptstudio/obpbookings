@@ -5,6 +5,7 @@ A mobile-first salon booking and management app for Organic by Pooja.
 ## Included
 
 - Public booking flow with Indian phone validation, date selection, live slot capacity, and confirmation.
+- Installable PWA with a browser install prompt, iOS Add to Home Screen guidance, and a cached app shell.
 - Atomic Supabase booking creation with two appointments per hour by default.
 - WhatsApp sharing and copy-to-clipboard confirmation actions.
 - Private Supabase-authenticated admin workspace with overview, appointment search, status changes, calendar, QR code, and salon settings.
